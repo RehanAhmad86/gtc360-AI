@@ -1,0 +1,10 @@
+# filepath: c:\Users\PMLS\Documents\gtc360-ai\.dockerignore
+frontend/
+node_modules/
+venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.vscode/

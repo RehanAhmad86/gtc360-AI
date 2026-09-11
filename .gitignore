@@ -1,0 +1,25 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Environment and Secrets
+.env
+*.env
+
+# Frontend Exclusion (Backend & AI Only Repository)
+frontend/
+
+# Python Cache & Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+models/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/ 
