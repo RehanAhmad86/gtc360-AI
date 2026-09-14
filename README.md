@@ -1,3 +1,12 @@
+---
+title: GTC360 AI Grant Matching Engine
+emoji: 🏛️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # GTC 360° AI — Intelligent Grant Matching Engine
 
 > **Project Status: Active Development**  

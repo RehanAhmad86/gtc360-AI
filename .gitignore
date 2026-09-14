@@ -7,8 +7,11 @@ ENV/
 .env
 *.env
 
-# Frontend Exclusion (Backend & AI Only Repository)
-frontend/
+# Node & Frontend Build Artifacts (Dependencies & dist ignored, source code tracked)
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
 
 # Python Cache & Artifacts
 __pycache__/
