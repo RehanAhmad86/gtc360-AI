@@ -54,11 +54,14 @@ try:
             probe_btn = gr.Button("Test Engine")
             probe_btn.click(fn=ai_probe, inputs=probe_in, outputs=probe_out)
 
+    # Hugging Face Spaces automatically imports and serves `app` on port 7860
     app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio")
 except Exception as e:
     # If gradio mounting fails or is unavailable, serve FastAPI directly
     app = fastapi_app
 
-if __name__ == "__main__":
+# Only run standalone uvicorn if running locally outside Hugging Face Spaces
+if __name__ == "__main__" and not os.getenv("SPACE_ID"):
+    import uvicorn
     port = int(os.getenv("PORT", 7860))
     uvicorn.run(app, host="0.0.0.0", port=port)
