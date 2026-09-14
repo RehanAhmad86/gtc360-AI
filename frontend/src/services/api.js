@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_PYTHON_AI_URL || 'http://localhost:7860';
+const rawUrl =
+  import.meta.env.VITE_PYTHON_AI_URL ||
+  (import.meta.env.PROD
+    ? 'https://rehan048686-guardmate-ai.hf.space'
+    : 'http://localhost:7860');
+
+const BASE_URL = rawUrl.replace(/\/+$/, '');
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
