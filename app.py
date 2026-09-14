@@ -6,6 +6,18 @@ import os
 import uvicorn
 from main import app as fastapi_app
 
+# ZeroGPU compatibility safeguard:
+# If the Space is running on ZeroGPU hardware, Hugging Face requires at least one @spaces.GPU function.
+try:
+    import spaces
+
+    @spaces.GPU(duration=1)
+    def _zerogpu_startup():
+        """Satisfies ZeroGPU startup scanner if deployed on ZeroGPU hardware."""
+        return True
+except Exception:
+    pass
+
 try:
     import gradio as gr
 
