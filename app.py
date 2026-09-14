@@ -27,7 +27,7 @@ try:
         * `GET /user/preferences` & `POST /user/preferences` — Target categories & agency affinities
         """)
 
-    app = gr.mount_gradio_app(fastapi_app, demo, path="/")
+    app = gr.mount_gradio_app(fastapi_app, demo, path="/gradio")
 except Exception as e:
     # If gradio mounting fails or is unavailable, serve FastAPI directly
     app = fastapi_app
