@@ -65,12 +65,15 @@ def evaluate_and_notify_user(
     # Already notified grant IDs
     notified_ids = set(prefs.get("notifiedGrantIds", []))
 
+    # Only consider opportunities that are active or upcoming (not closed, not past deadline)
+    active_ranked = [g for g in ranked if matcher.is_grant_active_or_upcoming(g)]
+
     # In test mode, always take top matches regardless of past notification
     if is_test:
-        matching_grants = ranked[:top_n]
+        matching_grants = active_ranked[:top_n]
     else:
         # Filter out opportunities previously emailed
-        candidates = [g for g in ranked if str(g.get("grant_id")) not in notified_ids]
+        candidates = [g for g in active_ranked if str(g.get("grant_id")) not in notified_ids]
         matching_grants = candidates[:top_n]
 
     if not matching_grants:
