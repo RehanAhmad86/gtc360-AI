@@ -227,6 +227,20 @@ def run_sync(federal_limit: int = 1500, california_limit: int = 1500) -> dict[st
     # 7. Hot-reload in-memory vector matrix
     cached_count = matcher.refresh_grants_cache()
 
+    # 8. Asynchronously evaluate and notify subscribed users
+    try:
+        import threading
+        import notification_manager
+
+        logger.info('Triggering asynchronous notification evaluation for subscribed users...')
+        threading.Thread(
+            target=notification_manager.dispatch_all_notifications,
+            daemon=True,
+            name='GrantSync-NotificationDispatcher',
+        ).start()
+    except Exception as notify_err:
+        logger.warning('Could not launch post-sync notification evaluation: %s', notify_err)
+
     return {
         "processed": total_count,
         "upserted": upserted_count,
