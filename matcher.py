@@ -6,6 +6,7 @@ Maintains an in-memory hot vector matrix cache for sub-10ms similarity scoring
 across federal and California state funding opportunities.
 """
 
+from datetime import datetime
 import logging
 import threading
 from typing import Any
@@ -179,10 +180,48 @@ AGENCY_ALIAS_MAP: dict[str, list[str]] = {
 }
 
 
+def is_grant_active_or_upcoming(grant: dict[str, Any]) -> bool:
+    """
+    Checks whether a grant opportunity is active, forecasted, or upcoming
+    (not closed/archived/expired, and close date is not older than today's date).
+    """
+    if not grant:
+        return False
+    status = str(grant.get("opp_status") or "").strip().lower()
+    if status in ("closed", "archived", "expired"):
+        return False
+
+    close_date_raw = str(grant.get("close_date") or "").strip()
+    if not close_date_raw:
+        return True
+
+    lower = close_date_raw.lower()
+    if any(k in lower for k in ("ongoing", "rolling", "continuous", "n/a", "unspecified")):
+        return True
+
+    now = datetime.now()
+    today_start = datetime(now.year, now.month, now.day)
+
+    clean_date = close_date_raw.split("T")[0] if "T" in close_date_raw else close_date_raw
+    clean_date = clean_date.split(" ")[0] if " " in clean_date and "/" in clean_date else clean_date
+
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%B %d, %Y", "%b %d, %Y", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            dt = datetime.strptime(clean_date.strip(), fmt)
+            if dt < today_start:
+                return False
+            return True
+        except (ValueError, TypeError):
+            continue
+
+    return True
+
+
 def rank_grants(
     user_preferences: dict[str, Any],
     top_k: int = 5000,
     min_score: float = MIN_SCORE_THRESHOLD,
+    only_active_upcoming: bool = True,
 ) -> list[dict[str, Any]]:
     """
     Perform sub-10ms semantic similarity ranking of all active grants against user profile.
@@ -263,6 +302,9 @@ def rank_grants(
 
     for idx, raw_score in enumerate(raw_scores):
         grant = metadata[idx]
+
+        if only_active_upcoming and not is_grant_active_or_upcoming(grant):
+            continue
 
         # Base semantic similarity normalized to 0.0 - 1.0 range
         base_sim = float(max(0.0, raw_score))
