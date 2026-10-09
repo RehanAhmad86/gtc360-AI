@@ -20,6 +20,8 @@ from pydantic import BaseModel, EmailStr, Field
 import db
 import matcher
 import sync_service
+import email_service
+import notification_manager
 
 load_dotenv()
 
@@ -160,6 +162,8 @@ class PreferencesPayload(BaseModel):
     maxAward: float = 0.0
     organizationType: str = ""
     customKeywords: str = ""
+    emailNotificationsEnabled: bool = True
+    notificationFrequency: str = "daily"
 
 
 class UserPreferencesRequest(PreferencesPayload):
@@ -298,6 +302,8 @@ def update_preferences(
             "maxAward": req.maxAward,
             "organizationType": req.organizationType,
             "customKeywords": req.customKeywords,
+            "emailNotificationsEnabled": req.emailNotificationsEnabled,
+            "notificationFrequency": req.notificationFrequency,
         },
     )
     if not updated_user:
@@ -413,3 +419,54 @@ def trigger_sync(federal_limit: int = 1500, california_limit: int = 1500):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Synchronization failed: {str(e)}",
         )
+
+
+# ─── Notification & Alert Management ──────────────────────────────────────────
+
+
+@app.post("/notifications/test", tags=["Notifications"])
+def send_test_notification(
+    auth_user_id: str | None = Depends(get_optional_user_id),
+    req: UserPreferencesRequest | None = None,
+):
+    """
+    Dispatch an immediate verified test email notification containing
+    top matching grant opportunities for the user's active preferences.
+    """
+    target_uid = auth_user_id or (req.userId if req else None)
+    if not target_uid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authentication token or userId is required to send a test notification.",
+        )
+
+    res = notification_manager.evaluate_and_notify_user(user_id=target_uid, is_test=True, top_n=3)
+    return res
+
+
+@app.post("/notifications/dispatch", tags=["Notifications"])
+def dispatch_notifications_cycle():
+    """
+    Trigger grant alert evaluation across all subscribed user profiles.
+    Evaluates new active opportunities against saved preferences and delivers alerts.
+    """
+    summary = notification_manager.dispatch_all_notifications()
+    return summary
+
+
+@app.get("/notifications/status", tags=["Notifications"])
+def get_notification_status():
+    """Return operational status and subscriber count for the email notification engine."""
+    cfg = email_service.get_email_config()
+    db_inst = db.get_database()
+    subscribers = db_inst.users.count_documents({"preferences.emailNotificationsEnabled": {"$ne": False}})
+    total_users = db_inst.users.count_documents({})
+    return {
+        "status": "operational",
+        "smtp_server": cfg["smtp_server"],
+        "smtp_port": cfg["smtp_port"],
+        "from_email": cfg["from_email"],
+        "from_name": cfg["from_name"],
+        "subscribed_users": subscribers,
+        "total_users": total_users,
+    }

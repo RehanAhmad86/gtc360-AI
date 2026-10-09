@@ -218,7 +218,7 @@ def update_user_preferences(user_id: str, preferences: dict[str, Any]) -> dict[s
     except Exception:
         return None
 
-    allowed_keys = ["targetCategories", "targetAgencies", "minAward", "maxAward", "organizationType", "customKeywords"]
+    allowed_keys = ["targetCategories", "targetAgencies", "minAward", "maxAward", "organizationType", "customKeywords", "emailNotificationsEnabled", "notificationFrequency", "notifiedGrantIds", "lastNotifiedAt"]
     update_data = {f"preferences.{k}": v for k, v in preferences.items() if k in allowed_keys}
     if "organizationType" in preferences and preferences["organizationType"]:
         update_data["organizationType"] = preferences["organizationType"]
