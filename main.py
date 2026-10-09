@@ -156,14 +156,14 @@ class LoginRequest(BaseModel):
 
 
 class PreferencesPayload(BaseModel):
-    targetCategories: list[str] = Field(default_factory=list)
-    targetAgencies: list[str] = Field(default_factory=list)
-    minAward: float = 0.0
-    maxAward: float = 0.0
-    organizationType: str = ""
-    customKeywords: str = ""
-    emailNotificationsEnabled: bool = True
-    notificationFrequency: str = "daily"
+    targetCategories: list[str] | None = None
+    targetAgencies: list[str] | None = None
+    minAward: float | None = None
+    maxAward: float | None = None
+    organizationType: str | None = None
+    customKeywords: str | None = None
+    emailNotificationsEnabled: bool | None = None
+    notificationFrequency: str | None = None
 
 
 class UserPreferencesRequest(PreferencesPayload):
@@ -293,18 +293,27 @@ def update_preferences(
 
     logger.info("Updating preferences in MongoDB for user ID: %s", target_uid)
 
+    pref_dict = {}
+    if req.targetCategories is not None:
+        pref_dict["targetCategories"] = req.targetCategories
+    if req.targetAgencies is not None:
+        pref_dict["targetAgencies"] = req.targetAgencies
+    if req.minAward is not None:
+        pref_dict["minAward"] = req.minAward
+    if req.maxAward is not None:
+        pref_dict["maxAward"] = req.maxAward
+    if req.organizationType is not None:
+        pref_dict["organizationType"] = req.organizationType
+    if req.customKeywords is not None:
+        pref_dict["customKeywords"] = req.customKeywords
+    if req.emailNotificationsEnabled is not None:
+        pref_dict["emailNotificationsEnabled"] = req.emailNotificationsEnabled
+    if req.notificationFrequency is not None:
+        pref_dict["notificationFrequency"] = req.notificationFrequency
+
     updated_user = db.update_user_preferences(
         user_id=target_uid,
-        preferences={
-            "targetCategories": req.targetCategories,
-            "targetAgencies": req.targetAgencies,
-            "minAward": req.minAward,
-            "maxAward": req.maxAward,
-            "organizationType": req.organizationType,
-            "customKeywords": req.customKeywords,
-            "emailNotificationsEnabled": req.emailNotificationsEnabled,
-            "notificationFrequency": req.notificationFrequency,
-        },
+        preferences=pref_dict,
     )
     if not updated_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found.")
