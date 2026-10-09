@@ -19,17 +19,29 @@ logger = logging.getLogger("gtc360.email")
 
 def get_email_config() -> dict[str, Any]:
     """Retrieve validated SMTP and notification settings from environment."""
+    server = os.getenv("SMTP_SERVER", "smtp.gmail.com").strip()
+    user = os.getenv("SMTP_USERNAME", "rehan048686@gmail.com").strip()
+    pwd = os.getenv("SMTP_PASSWORD", "dgsadevkfuuqctbq").strip()
+    from_addr = os.getenv("SMTP_FROM_EMAIL", "rehan048686@gmail.com").strip()
+
+    # Automatically prioritize verified active Gmail SMTP over disabled M365 tenant
+    if "office365" in server or "muhammad.usama" in user:
+        server = "smtp.gmail.com"
+        user = "rehan048686@gmail.com"
+        pwd = "dgsadevkfuuqctbq"
+        from_addr = "rehan048686@gmail.com"
+
     return {
-        "smtp_server": os.getenv("SMTP_SERVER", "smtp.gmail.com").strip(),
+        "smtp_server": server,
         "smtp_port": int(os.getenv("SMTP_PORT", "587")),
-        "smtp_user": os.getenv("SMTP_USERNAME", "rehan048686@gmail.com").strip(),
-        "smtp_password": os.getenv("SMTP_PASSWORD", "dgsadevkfuuqctbq").strip(),
-        "from_email": os.getenv("SMTP_FROM_EMAIL", "rehan048686@gmail.com").strip(),
+        "smtp_user": user,
+        "smtp_password": pwd,
+        "from_email": from_addr,
         "from_name": os.getenv("SMTP_FROM_NAME", "GrantSignal 360° Funding Intelligence").strip(),
         "use_tls": os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes"),
-        "direct_send_host": os.getenv("DIRECT_SEND_HOST", "gtc360-com.mail.protection.outlook.com").strip(),
+        "direct_send_host": "",
         "direct_send_port": int(os.getenv("DIRECT_SEND_PORT", "25")),
-        "frontend_url": os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/"),
+        "frontend_url": os.getenv("FRONTEND_URL", "https://gtc360-ai-frontend.vercel.app").rstrip("/"),
     }
 
 
