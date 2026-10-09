@@ -41,7 +41,7 @@ def get_email_config() -> dict[str, Any]:
         "use_tls": os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes"),
         "direct_send_host": "",
         "direct_send_port": int(os.getenv("DIRECT_SEND_PORT", "25")),
-        "frontend_url": os.getenv("FRONTEND_URL", "https://gtc360-ai-frontend.vercel.app").rstrip("/"),
+        "frontend_url": os.getenv("FRONTEND_URL", "https://grantsignal.gtc360.com").rstrip("/"),
     }
 
 
