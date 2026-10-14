@@ -54,7 +54,7 @@ def evaluate_and_notify_user(
         active_prefs["organizationType"] = user.get("organizationType")
 
     # Perform high-speed vector matching
-    ranked = matcher.rank_grants(active_prefs, top_k=25, only_active_upcoming=True)
+    ranked = matcher.rank_grants(active_prefs, top_k=500, min_score=35.0, only_active_upcoming=True)
     if not ranked:
         return {
             "status": "no_grants_available",
