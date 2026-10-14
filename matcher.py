@@ -221,7 +221,7 @@ def rank_grants(
     user_preferences: dict[str, Any],
     top_k: int = 5000,
     min_score: float = MIN_SCORE_THRESHOLD,
-    only_active_upcoming: bool = True,
+    only_active_upcoming: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Perform sub-10ms semantic similarity ranking of all active grants against user profile.
@@ -256,23 +256,12 @@ def rank_grants(
         # Return catalog grants with NO fabricated match score
         results: list[dict[str, Any]] = []
         for grant in metadata:
-            results.append(
-                {
-                    "grant_id": grant.get("grant_id"),
-                    "opp_number": grant.get("opp_number", ""),
-                    "title": grant.get("title", ""),
-                    "agency": grant.get("agency", ""),
-                    "agency_code": grant.get("agency_code", ""),
-                    "open_date": grant.get("open_date", ""),
-                    "close_date": grant.get("close_date", ""),
-                    "opp_status": grant.get("opp_status", "posted"),
-                    "description": grant.get("description", ""),
-                    "grant_url": grant.get("grant_url", ""),
-                    "source": grant.get("source", "federal"),
-                    "score": None,
-                    "breakdown": None,
-                }
-            )
+            if only_active_upcoming and not is_grant_active_or_upcoming(grant):
+                continue
+            item = {k: v for k, v in grant.items() if k != "embedding"}
+            item["score"] = None
+            item["breakdown"] = None
+            results.append(item)
         if top_k > 0:
             return results[:top_k]
         return results
@@ -345,27 +334,14 @@ def rank_grants(
         score_pct = round(final_score_float * 100.0, 1)
 
         if score_pct >= min_score:
-            results.append(
-                {
-                    "grant_id": grant.get("grant_id"),
-                    "opp_number": grant.get("opp_number", ""),
-                    "title": grant.get("title", ""),
-                    "agency": grant.get("agency", ""),
-                    "agency_code": grant.get("agency_code", ""),
-                    "open_date": grant.get("open_date", ""),
-                    "close_date": grant.get("close_date", ""),
-                    "opp_status": grant.get("opp_status", "posted"),
-                    "description": grant.get("description", ""),
-                    "grant_url": grant.get("grant_url", ""),
-                    "source": grant.get("source", "federal"),
-                    "score": score_pct,
-                    "breakdown": {
-                        "semanticScore": round(base_sim * 100.0, 1),
-                        "agencyBoost": round(boost_amount * 100.0, 1),
-                        "agencyMatched": agency_boost_applied,
-                    },
-                }
-            )
+            item = {k: v for k, v in grant.items() if k != "embedding"}
+            item["score"] = score_pct
+            item["breakdown"] = {
+                "semanticScore": round(base_sim * 100.0, 1),
+                "agencyBoost": round(boost_amount * 100.0, 1),
+                "agencyMatched": agency_boost_applied,
+            }
+            results.append(item)
 
     # Sort descending by match score
     results.sort(key=lambda r: r["score"], reverse=True)
