@@ -295,6 +295,12 @@ def get_all_grants_with_embeddings() -> list[dict[str, Any]]:
             "description": 1,
             "grant_url": 1,
             "source": 1,
+            "cfda_list": 1,
+            "doc_type": 1,
+            "award_ceiling": 1,
+            "award_floor": 1,
+            "eligibility": 1,
+            "category": 1,
             "embedding": 1,
         },
     )
