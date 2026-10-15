@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Depends, status
+from fastapi import FastAPI, Header, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 
@@ -478,4 +478,64 @@ def get_notification_status():
         "from_name": cfg["from_name"],
         "subscribed_users": subscribers,
         "total_users": total_users,
+    }
+
+
+# ─── Guest IP Search Quota Tracking ──────────────────────────────────────────────
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP behind proxies, load balancers, or Cloudflare."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+
+@app.get("/guest/quota", tags=["Guest"])
+def get_guest_search_quota(request: Request):
+    """Get the current IP-tracked search quota for non-signed-in visitors (5 free searches)."""
+    client_ip = get_client_ip(request)
+    doc = db.get_guest_search_record(client_ip)
+    used = doc.get("count", 0) if doc else 0
+    max_searches = 5
+    return {
+        "ip": client_ip,
+        "used": used,
+        "max": max_searches,
+        "remaining": max(0, max_searches - used),
+        "is_limit_reached": used >= max_searches,
+    }
+
+
+@app.post("/guest/record-search", tags=["Guest"])
+def record_guest_search(request: Request):
+    """Increment and return the IP-tracked search quota for non-signed-in visitors."""
+    client_ip = get_client_ip(request)
+    doc = db.get_guest_search_record(client_ip)
+    current_used = doc.get("count", 0) if doc else 0
+    max_searches = 5
+    if current_used >= max_searches:
+        return {
+            "allowed": False,
+            "ip": client_ip,
+            "used": current_used,
+            "max": max_searches,
+            "remaining": 0,
+            "is_limit_reached": True,
+        }
+    new_count = db.increment_guest_search(client_ip)
+    return {
+        "allowed": True,
+        "ip": client_ip,
+        "used": new_count,
+        "max": max_searches,
+        "remaining": max(0, max_searches - new_count),
+        "is_limit_reached": new_count >= max_searches,
     }
