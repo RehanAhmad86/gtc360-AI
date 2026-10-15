@@ -325,3 +325,31 @@ def count_grants() -> int:
         return get_database().grants.count_documents({})
     except Exception:
         return 0
+
+
+def get_guest_search_record(ip: str) -> dict[str, Any] | None:
+    """Retrieve the search count record for a visitor by their IP address."""
+    if not ip:
+        return None
+    db = get_database()
+    return db.guest_searches.find_one({"ip": ip}, {"_id": 0})
+
+
+def increment_guest_search(ip: str) -> int:
+    """Atomically increment the search count for a visitor IP and return new count."""
+    if not ip:
+        return 1
+    db = get_database()
+    now = datetime.now(timezone.utc)
+    from pymongo import ReturnDocument
+    res = db.guest_searches.find_one_and_update(
+        {"ip": ip},
+        {
+            "$inc": {"count": 1},
+            "$set": {"last_searched_at": now},
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return res.get("count", 1) if res else 1
