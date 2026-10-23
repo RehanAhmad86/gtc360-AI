@@ -174,6 +174,10 @@ def create_user(
         "password": hash_password(password),
         "organizationType": organization_type.strip(),
         "preferences": default_prefs,
+        "plan": "explorer",
+        "planName": "Free Account",
+        "planStatus": "active",
+        "savedGrants": [],
         "createdAt": datetime.now(timezone.utc),
     }
 
@@ -190,6 +194,11 @@ def get_user_by_email(email: str) -> dict[str, Any] | None:
     user = db.users.find_one({"email": clean_email})
     if user:
         user["_id"] = str(user["_id"])
+        if not user.get("plan"):
+            user["plan"] = "explorer"
+            user["planName"] = "Free Account"
+        if "savedGrants" not in user:
+            user["savedGrants"] = []
     return user
 
 
@@ -204,6 +213,11 @@ def get_user_by_id(user_id: str) -> dict[str, Any] | None:
     user = db.users.find_one({"_id": oid}, {"password": 0})
     if user:
         user["_id"] = str(user["_id"])
+        if not user.get("plan"):
+            user["plan"] = "explorer"
+            user["planName"] = "Free Account"
+        if "savedGrants" not in user:
+            user["savedGrants"] = []
     return user
 
 
@@ -228,6 +242,73 @@ def update_user_preferences(user_id: str, preferences: dict[str, Any]) -> dict[s
 
     db.users.update_one({"_id": oid}, {"$set": update_data})
     return get_user_by_id(user_id)
+
+
+def update_user_plan(user_id: str, plan: str) -> dict[str, Any] | None:
+    """
+    Update subscription plan tier for user.
+    Valid plans: 'explorer' (Free Account), 'advanced' (Advanced Tier), 'professional' (Professional).
+    """
+    valid_plans = {
+        "explorer": "Free Account",
+        "advanced": "Advanced Tier",
+        "professional": "Professional",
+    }
+    clean_plan = plan.lower().strip()
+    if clean_plan not in valid_plans:
+        raise ValueError(f"Invalid plan '{plan}'. Must be one of: {list(valid_plans.keys())}")
+
+    db = get_database()
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return None
+
+    db.users.update_one(
+        {"_id": oid},
+        {"$set": {
+            "plan": clean_plan,
+            "planName": valid_plans[clean_plan],
+            "planUpdatedAt": datetime.now(timezone.utc),
+        }}
+    )
+    return get_user_by_id(user_id)
+
+
+def toggle_saved_grant(user_id: str, grant_id: str) -> dict[str, Any]:
+    """
+    Save or unsave a grant for an authenticated user, enforcing plan capacity.
+    - Free Account ('explorer'): max 5 saved grants
+    - Advanced Tier ('advanced'): max 50 saved grants
+    - Professional ('professional'): unlimited
+    """
+    db = get_database()
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        raise ValueError("Invalid user ID")
+
+    user = get_user_by_id(user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    plan = user.get("plan", "explorer")
+    saved = user.get("savedGrants", [])
+
+    if grant_id in saved:
+        db.users.update_one({"_id": oid}, {"$pull": {"savedGrants": grant_id}})
+        saved.remove(grant_id)
+        return {"isSaved": False, "savedGrants": saved, "count": len(saved)}
+    else:
+        limits = {"explorer": 5, "advanced": 50, "professional": float("inf")}
+        max_allowed = limits.get(plan, 5)
+        if len(saved) >= max_allowed:
+            raise ValueError(f"Your {user.get('planName', 'Free Account')} plan is limited to {max_allowed} saved grants. Please upgrade to expand your pipeline.")
+
+        db.users.update_one({"_id": oid}, {"$addToSet": {"savedGrants": grant_id}})
+        saved.append(grant_id)
+        return {"isSaved": True, "savedGrants": saved, "count": len(saved)}
+
 
 
 # ─── Grants Operations ────────────────────────────────────────────────────────

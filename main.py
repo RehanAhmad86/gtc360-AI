@@ -180,6 +180,14 @@ class CompareRequest(BaseModel):
     grant_ids: list[str]
 
 
+class UpdatePlanRequest(BaseModel):
+    plan: str = Field(..., description="Plan tier: 'explorer', 'advanced', or 'professional'")
+
+
+class SavedGrantRequest(BaseModel):
+    grant_id: str
+
+
 # ─── Core REST Endpoints ──────────────────────────────────────────────────────
 
 
@@ -324,6 +332,37 @@ def update_preferences(
     }
 
 
+@app.put("/user/plan", tags=["User"])
+@app.post("/user/plan", tags=["User"])
+def set_user_plan(req: UpdatePlanRequest, user_id: str = Depends(get_current_user_id)):
+    """
+    Update plan tier for the authenticated user.
+    Enables setting Explorer (Free Account), Advanced Tier, or Professional.
+    """
+    try:
+        updated_user = db.update_user_plan(user_id, req.plan)
+        if not updated_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        return {
+            "user": updated_user,
+            "message": f"Plan updated to {updated_user.get('planName')}.",
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.post("/user/saved-grants", tags=["User"])
+def toggle_user_saved_grant(req: SavedGrantRequest, user_id: str = Depends(get_current_user_id)):
+    """
+    Toggle saving/bookmarking a grant for the authenticated user, enforcing plan capacity.
+    """
+    try:
+        result = db.toggle_saved_grant(user_id, req.grant_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 # ─── Matching & Comparison Engine ─────────────────────────────────────────────
 
 
@@ -393,16 +432,40 @@ def match_grants(
 
 
 @app.post("/grants/compare", tags=["Comparison"])
-def compare_grants(req: CompareRequest):
+def compare_grants(
+    req: CompareRequest,
+    auth_user_id: str | None = Depends(get_optional_user_id),
+):
     """
     Fetch full opportunity documents for side-by-side comparison
     across agencies, deadlines, descriptions, and eligibility.
+    Enforces plan limits:
+      - Guest: requires account
+      - Free Account ('explorer'): requires Advanced / Professional upgrade
+      - Advanced Tier ('advanced'): up to 5 opportunities
+      - Professional ('professional'): up to 10 opportunities
     """
     if not req.grant_ids:
         return {"grants": []}
 
-    grants = db.get_grants_by_ids(req.grant_ids[:10])  # limit to 10 max comparison items
-    return {"grants": grants}
+    if not auth_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Opportunity comparison board requires an account. Please sign in.",
+        )
+
+    user = db.get_user_by_id(auth_user_id)
+    user_plan = (user.get("plan") if user else "explorer") or "explorer"
+
+    if user_plan == "explorer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Opportunity comparison board requires an Advanced Tier or Professional plan. Subscriptions will open soon; please continue with the Free Account for now.",
+        )
+
+    max_items = 10 if user_plan == "professional" else 5
+    grants = db.get_grants_by_ids(req.grant_ids[:max_items])
+    return {"grants": grants, "plan": user_plan, "limit": max_items}
 
 
 # ─── Synchronization & Admin ──────────────────────────────────────────────────
