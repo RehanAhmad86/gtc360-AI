@@ -375,6 +375,7 @@ def toggle_user_saved_grant(req: SavedGrantRequest, user_id: str = Depends(get_c
 @app.post("/match", tags=["Matching"])
 def match_grants(
     req: MatchRequest,
+    request: Request,
     auth_user_id: str | None = Depends(get_optional_user_id),
 ):
     """
@@ -385,8 +386,27 @@ def match_grants(
     """
     target_uid = auth_user_id or req.userId
 
-    # AI matching is strictly enabled for authenticated users with saved preferences
+    # Check if request includes custom search/filter preferences
+    has_custom_filters = bool(
+        req.preferences and (
+            req.preferences.targetCategories or
+            req.preferences.targetAgencies or
+            req.preferences.customKeywords or
+            req.preferences.organizationType
+        )
+    )
+
+    # Visitor quota check (5 searches max)
     if not target_uid:
+        client_ip = get_client_ip(request)
+        doc = db.get_guest_search_record(client_ip)
+        guest_used = doc.get("count", 0) if doc else 0
+        if guest_used >= 5 and has_custom_filters:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Visitor complimentary search quota reached (5 of 5 searches used). Please create a free account to continue searching.",
+            )
+
         ranked_matches = matcher.rank_grants(user_preferences={}, top_k=req.top_k)
         return {
             "totalMatches": len(ranked_matches),
@@ -404,6 +424,14 @@ def match_grants(
             "targetAgencies": [],
             "matches": ranked_matches,
         }
+
+    # Free Account monthly search quota check (10 searches/month)
+    user_quota = db.get_user_search_quota(target_uid)
+    if user_quota.get("is_limit_reached") and has_custom_filters:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Monthly search limit reached for your Free Account (10 of 10 used). Please upgrade to Advanced Tier or Professional for unmetered searches.",
+        )
 
     active_prefs = user.get("preferences", {}).copy()
     active_prefs["organizationType"] = user.get("organizationType", "")
@@ -614,3 +642,21 @@ def record_guest_search(request: Request):
         "remaining": max(0, max_searches - new_count),
         "is_limit_reached": new_count >= max_searches,
     }
+
+
+@app.get("/user/search-quota", tags=["User"])
+def get_user_search_quota_endpoint(user_id: str = Depends(get_current_user_id)):
+    """Retrieve monthly search quota and usage for the authenticated user."""
+    return db.get_user_search_quota(user_id)
+
+
+@app.post("/user/record-search", tags=["User"])
+def record_user_search_endpoint(user_id: str = Depends(get_current_user_id)):
+    """Record a search query credit consumption for the authenticated user."""
+    result = db.increment_user_search(user_id)
+    if not result.get("allowed", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Monthly search limit reached for your plan. Please upgrade to continue.",
+        )
+    return result

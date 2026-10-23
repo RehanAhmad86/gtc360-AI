@@ -434,3 +434,65 @@ def increment_guest_search(ip: str) -> int:
         return_document=ReturnDocument.AFTER,
     )
     return res.get("count", 1) if res else 1
+
+
+def get_user_search_quota(user_id: str) -> dict[str, Any]:
+    """Get current monthly search quota for an authenticated user."""
+    user = get_user_by_id(user_id)
+    if not user:
+        return {"plan": "visitor", "used": 0, "max": 5, "remaining": 5, "is_limit_reached": False}
+
+    plan = user.get("plan", "explorer")
+    if plan in ("advanced", "professional"):
+        return {"plan": plan, "used": 0, "max": -1, "remaining": 999999, "is_limit_reached": False}
+
+    now = datetime.now(timezone.utc)
+    month_key = f"{now.year}-{now.month:02d}"
+    database = get_database()
+    record = database.user_searches.find_one({"user_id": str(user_id), "month_key": month_key})
+    used = record.get("count", 0) if record else 0
+    max_searches = 10
+    return {
+        "plan": plan,
+        "month_key": month_key,
+        "used": used,
+        "max": max_searches,
+        "remaining": max(0, max_searches - used),
+        "is_limit_reached": used >= max_searches,
+    }
+
+
+def increment_user_search(user_id: str) -> dict[str, Any]:
+    """Increment search count for an authenticated user if allowed."""
+    quota = get_user_search_quota(user_id)
+    if quota["plan"] in ("advanced", "professional"):
+        return {"allowed": True, **quota}
+
+    if quota["is_limit_reached"]:
+        return {"allowed": False, **quota}
+
+    now = datetime.now(timezone.utc)
+    month_key = quota.get("month_key", f"{now.year}-{now.month:02d}")
+    database = get_database()
+    from pymongo import ReturnDocument
+    res = database.user_searches.find_one_and_update(
+        {"user_id": str(user_id), "month_key": month_key},
+        {
+            "$inc": {"count": 1},
+            "$set": {"last_searched_at": now},
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    new_used = res.get("count", 1) if res else 1
+    max_searches = quota["max"]
+    return {
+        "allowed": True,
+        "plan": quota["plan"],
+        "month_key": month_key,
+        "used": new_used,
+        "max": max_searches,
+        "remaining": max(0, max_searches - new_used),
+        "is_limit_reached": new_used >= max_searches,
+    }
