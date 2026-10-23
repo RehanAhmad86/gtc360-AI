@@ -243,7 +243,10 @@ def signup(req: SignupRequest):
             "message": "Account created successfully.",
         }
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        msg = str(e)
+        if 'plan is limited to' in msg or 'upgrade' in msg:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
     except Exception as e:
         logger.error("Signup failed: %s", e)
         raise HTTPException(
@@ -360,7 +363,10 @@ def toggle_user_saved_grant(req: SavedGrantRequest, user_id: str = Depends(get_c
         result = db.toggle_saved_grant(user_id, req.grant_id)
         return result
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        msg = str(e)
+        if "plan is limited to" in msg or "upgrade" in msg:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
 
 # ─── Matching & Comparison Engine ─────────────────────────────────────────────
@@ -464,6 +470,12 @@ def compare_grants(
         )
 
     max_items = 10 if user_plan == "professional" else 5
+    if len(req.grant_ids) > max_items:
+        plan_label = "Professional" if user_plan == "professional" else "Advanced Tier"
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Your {plan_label} plan allows comparing up to {max_items} opportunities side-by-side.",
+        )
     grants = db.get_grants_by_ids(req.grant_ids[:max_items])
     return {"grants": grants, "plan": user_plan, "limit": max_items}
 
