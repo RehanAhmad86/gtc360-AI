@@ -6,6 +6,9 @@ Dispatches via authenticated SMTP (Office 365, custom SMTP, or Direct Send).
 """
 
 import os
+import urllib.request
+import urllib.parse
+import json
 import smtplib
 import ssl
 import logging
@@ -223,6 +226,87 @@ def build_grant_alert_email(
     return subject, plain_body, html_body
 
 
+
+
+def get_graph_config() -> dict[str, str]:
+    """Retrieve Microsoft Graph API / Azure App Registration settings."""
+    return {
+        "tenant_id": os.getenv("AZURE_TENANT_ID", "").strip(),
+        "client_id": os.getenv("AZURE_CLIENT_ID", "").strip(),
+        "client_secret": os.getenv("AZURE_CLIENT_SECRET", "").strip(),
+        "from_email": os.getenv("MS_GRAPH_FROM_EMAIL", "muhammad.usama@gtc360.com").strip(),
+    }
+
+
+def send_email_via_graph(
+    to_email: str,
+    subject: str,
+    plain_text: str,
+    html_content: str,
+) -> dict[str, Any]:
+    """
+    Sends email directly via Microsoft Graph API using OAuth2 Client Credentials.
+    Completely immune to MFA / 2FA and Basic Auth restrictions.
+    """
+    graph_cfg = get_graph_config()
+    tenant_id = graph_cfg["tenant_id"]
+    client_id = graph_cfg["client_id"]
+    client_secret = graph_cfg["client_secret"]
+    from_email = graph_cfg["from_email"]
+
+    if not (tenant_id and client_id and client_secret and from_email):
+        raise ValueError("Microsoft Graph API is not fully configured.")
+
+    # 1. Acquire Token
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_data = urllib.parse.urlencode({
+        "client_id": client_id,
+        "scope": "https://graph.microsoft.com/.default",
+        "client_secret": client_secret,
+        "grant_type": "client_credentials",
+    }).encode("utf-8")
+
+    token_req = urllib.request.Request(token_url, data=token_data, method="POST")
+    with urllib.request.urlopen(token_req, timeout=15) as resp:
+        token_res = json.loads(resp.read().decode("utf-8"))
+        access_token = token_res["access_token"]
+
+    # 2. Dispatch Email
+    send_url = f"https://graph.microsoft.com/v1.0/users/{from_email}/sendMail"
+    payload = {
+        "message": {
+            "subject": subject,
+            "body": {
+                "contentType": "HTML" if html_content else "Text",
+                "content": html_content if html_content else plain_text,
+            },
+            "toRecipients": [
+                {
+                    "emailAddress": {
+                        "address": to_email.strip().lower()
+                    }
+                }
+            ],
+        },
+        "saveToSentItems": "true",
+    }
+
+    send_data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    send_req = urllib.request.Request(send_url, data=send_data, headers=headers, method="POST")
+    with urllib.request.urlopen(send_req, timeout=15) as resp:
+        return {
+            "success": True,
+            "channel": "microsoft_graph",
+            "recipient": to_email.strip().lower(),
+            "message": "Notification email sent successfully via Microsoft Graph API (Office 365).",
+        }
+
+
 def send_email(
     to_email: str,
     subject: str,
@@ -249,6 +333,19 @@ def send_email(
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     errors = []
+
+    # Priority 1: Microsoft Graph API (Direct Enterprise Dispatch)
+    graph_cfg = get_graph_config()
+    if graph_cfg["client_id"] and graph_cfg["client_secret"] and graph_cfg["tenant_id"]:
+        try:
+            logger.info("Attempting dispatch via Microsoft Graph API for %s (from: %s)...", to_clean, graph_cfg["from_email"])
+            res = send_email_via_graph(to_clean, subject, plain_text, html_content)
+            logger.info("Email delivered successfully via Microsoft Graph to %s", to_clean)
+            return res
+        except Exception as e:
+            err_msg = str(e)
+            logger.warning("Microsoft Graph delivery error: %s", err_msg)
+            errors.append(f"Microsoft Graph: {err_msg}")
 
     # Attempt 1: Authenticated SMTP
     try:
