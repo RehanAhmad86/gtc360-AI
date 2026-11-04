@@ -23,9 +23,9 @@ logger = logging.getLogger("gtc360.email")
 def get_email_config() -> dict[str, Any]:
     """Retrieve validated SMTP and notification settings from environment."""
     server = os.getenv("SMTP_SERVER", "smtp.office365.com").strip()
-    user = os.getenv("SMTP_USERNAME", "muhammad.usama@gtc360.com").strip()
+    user = os.getenv("SMTP_USERNAME", "hello@gtc360.com").strip()
     pwd = os.getenv("SMTP_PASSWORD", "").strip()
-    from_addr = os.getenv("SMTP_FROM_EMAIL", "muhammad.usama@gtc360.com").strip()
+    from_addr = os.getenv("SMTP_FROM_EMAIL", "hello@gtc360.com").strip()
 
     return {
         "smtp_server": server,
@@ -227,7 +227,7 @@ def get_graph_config() -> dict[str, str]:
         "tenant_id": os.getenv("AZURE_TENANT_ID", "").strip(),
         "client_id": os.getenv("AZURE_CLIENT_ID", "").strip(),
         "client_secret": os.getenv("AZURE_CLIENT_SECRET", "").strip(),
-        "from_email": os.getenv("MS_GRAPH_FROM_EMAIL", "muhammad.usama@gtc360.com").strip(),
+        "from_email": os.getenv("MS_GRAPH_FROM_EMAIL", "hello@gtc360.com").strip(),
     }
 
 
