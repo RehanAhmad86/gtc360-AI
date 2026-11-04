@@ -22,17 +22,10 @@ logger = logging.getLogger("gtc360.email")
 
 def get_email_config() -> dict[str, Any]:
     """Retrieve validated SMTP and notification settings from environment."""
-    server = os.getenv("SMTP_SERVER", "smtp.gmail.com").strip()
-    user = os.getenv("SMTP_USERNAME", "rehan048686@gmail.com").strip()
-    pwd = os.getenv("SMTP_PASSWORD", "dgsadevkfuuqctbq").strip()
-    from_addr = os.getenv("SMTP_FROM_EMAIL", "rehan048686@gmail.com").strip()
-
-    # Automatically prioritize verified active Gmail SMTP over disabled M365 tenant
-    if "office365" in server or "muhammad.usama" in user:
-        server = "smtp.gmail.com"
-        user = "rehan048686@gmail.com"
-        pwd = "dgsadevkfuuqctbq"
-        from_addr = "rehan048686@gmail.com"
+    server = os.getenv("SMTP_SERVER", "smtp.office365.com").strip()
+    user = os.getenv("SMTP_USERNAME", "muhammad.usama@gtc360.com").strip()
+    pwd = os.getenv("SMTP_PASSWORD", "").strip()
+    from_addr = os.getenv("SMTP_FROM_EMAIL", "muhammad.usama@gtc360.com").strip()
 
     return {
         "smtp_server": server,
