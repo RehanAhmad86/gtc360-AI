@@ -6,6 +6,7 @@ Dispatches via authenticated SMTP (Office 365, custom SMTP, or Direct Send).
 """
 
 import os
+import base64
 import urllib.request
 import urllib.parse
 import json
@@ -20,6 +21,13 @@ from dotenv import load_dotenv
 
 _backend_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_backend_dir, ".env"))
+
+_logo_file = os.path.join(_backend_dir, "gtc360-avatar-white-bg.png")
+_LOGO_BASE64 = ""
+if os.path.exists(_logo_file):
+    with open(_logo_file, "rb") as _lf:
+        _LOGO_BASE64 = base64.b64encode(_lf.read()).decode("utf-8")
+
 
 logger = logging.getLogger("gtc360.email")
 
@@ -176,7 +184,7 @@ def build_grant_alert_email(
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                                 <tr>
                                     <td valign="middle" style="width:48px;padding-right:14px;">
-                                        <img src="https://gtc360.com/wp-content/uploads/2023/04/cropped-fav-gtc360-192x192.png" alt="GTC 360&deg;" width="38" height="38" style="display:block;border-radius:50%;background:#FFFFFF;padding:4px;border:0;" />
+                                        <img src="cid:gtc360_logo" alt="GTC 360&deg;" width="44" height="44" style="display:block;border-radius:50%;border:0;" />
                                     </td>
                                     <td valign="middle">
                                         <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#C4B09A;margin-bottom:4px;">
@@ -281,6 +289,17 @@ def send_email_via_graph(
     # 2. Dispatch Email
     send_url = f"https://graph.microsoft.com/v1.0/users/{from_email}/sendMail"
     from_name = graph_cfg.get("from_name", "GTC 360° Advisors")
+    attachments = []
+    if _LOGO_BASE64:
+        attachments.append({
+            "@odata.type": "#microsoft.graph.fileAttachment",
+            "name": "gtc360-logo.png",
+            "contentType": "image/png",
+            "contentBytes": _LOGO_BASE64,
+            "isInline": True,
+            "contentId": "gtc360_logo",
+        })
+
     payload = {
         "message": {
             "subject": subject,
@@ -301,6 +320,7 @@ def send_email_via_graph(
                     }
                 }
             ],
+            "attachments": attachments,
         },
         "saveToSentItems": "true",
     }
