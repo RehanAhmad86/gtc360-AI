@@ -16,6 +16,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_backend_dir, ".env"))
 
 logger = logging.getLogger("gtc360.email")
 
@@ -33,7 +37,7 @@ def get_email_config() -> dict[str, Any]:
         "smtp_user": user,
         "smtp_password": pwd,
         "from_email": from_addr,
-        "from_name": os.getenv("SMTP_FROM_NAME", "GrantSignal 360° Funding Intelligence").strip(),
+        "from_name": os.getenv("SMTP_FROM_NAME", "GTC 360° Advisors").strip(),
         "use_tls": os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes"),
         "direct_send_host": "",
         "direct_send_port": int(os.getenv("DIRECT_SEND_PORT", "25")),
@@ -168,13 +172,22 @@ def build_grant_alert_email(
             <td align="center">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(15,23,42,0.06);border:1px solid #E2E8F0;">
                     <tr>
-                        <td style="background:#142D4C;padding:32px 28px;text-align:left;border-bottom:3px solid #958064;">
-                            <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#C4B09A;margin-bottom:6px;">
-                                GTC 360&deg; GRANT INTELLIGENCE &bull; ALERT NOTIFICATION
-                            </div>
-                            <div style="font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.02em;line-height:1.2;">
-                                GrantSignal 360&deg;
-                            </div>
+                        <td style="background:#142D4C;padding:24px 28px;text-align:left;border-bottom:3px solid #958064;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td valign="middle" style="width:48px;padding-right:14px;">
+                                        <img src="https://grantsignal.gtc360.com/gtc360-favicon.png" alt="GTC 360&deg;" width="42" height="42" style="display:block;border-radius:6px;border:0;" />
+                                    </td>
+                                    <td valign="middle">
+                                        <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#C4B09A;margin-bottom:4px;">
+                                            GTC 360&deg; ADVISORS &bull; GRANT INTELLIGENCE
+                                        </div>
+                                        <div style="font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.02em;line-height:1.2;">
+                                            GrantSignal 360&deg;
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     <tr>
@@ -228,6 +241,7 @@ def get_graph_config() -> dict[str, str]:
         "client_id": os.getenv("AZURE_CLIENT_ID", "").strip(),
         "client_secret": os.getenv("AZURE_CLIENT_SECRET", "").strip(),
         "from_email": os.getenv("MS_GRAPH_FROM_EMAIL", "hello@gtc360.com").strip(),
+        "from_name": os.getenv("MS_GRAPH_FROM_NAME", "GTC 360° Advisors").strip(),
     }
 
 
@@ -266,9 +280,16 @@ def send_email_via_graph(
 
     # 2. Dispatch Email
     send_url = f"https://graph.microsoft.com/v1.0/users/{from_email}/sendMail"
+    from_name = graph_cfg.get("from_name", "GTC 360° Advisors")
     payload = {
         "message": {
             "subject": subject,
+            "from": {
+                "emailAddress": {
+                    "name": from_name,
+                    "address": from_email,
+                }
+            },
             "body": {
                 "contentType": "HTML" if html_content else "Text",
                 "content": html_content if html_content else plain_text,
