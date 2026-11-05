@@ -176,7 +176,7 @@ def build_grant_alert_email(
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                                 <tr>
                                     <td valign="middle" style="width:48px;padding-right:14px;">
-                                        <img src="https://gtc360.com/wp-content/uploads/2023/04/cropped-fav-gtc360-192x192.png" alt="GTC 360&deg;" width="42" height="42" style="display:block;border-radius:6px;border:0;" />
+                                        <img src="https://gtc360.com/wp-content/uploads/2023/04/cropped-fav-gtc360-192x192.png" alt="GTC 360&deg;" width="38" height="38" style="display:block;border-radius:50%;background:#FFFFFF;padding:4px;border:0;" />
                                     </td>
                                     <td valign="middle">
                                         <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#C4B09A;margin-bottom:4px;">
